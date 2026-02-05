@@ -68,8 +68,8 @@ else
         local page_content=""
         local download_url=""
         
-        # Busca a página de Server do wiki.gg
-        page_content=$(curl -sSL "https://terraria.wiki.gg/wiki/Server" 2>/dev/null)
+        # Busca a página de Server do wiki.gg (seção Downloads)
+        page_content=$(curl -sSL "https://terraria.wiki.gg/wiki/Server#Downloads" 2>/dev/null)
         
         if [ "${version}" = "latest" ] || [ "${version}" = "" ]; then
             # Pega o primeiro link de download (mais recente)
