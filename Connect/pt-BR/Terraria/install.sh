@@ -48,6 +48,7 @@ fi
 # Cor adicional
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
+RED='\033[1;31m'
 
 # Função para formatar versão (1454 → 1.4.5.4)
 format_version() {
@@ -224,14 +225,97 @@ if [ -f "./TerrariaServer.exe" ]; then
     fi
 fi
 
-# Instalação do servidor (apenas quando não existe TerrariaServer.exe)
-if [ ! -f "./TerrariaServer.exe" ]; then
-
-    apk add --no-cache --upgrade curl wget file unzip zip
-
-    mkdir -p /mnt/server/
-    cd /mnt/server/ || exit
+# Função para reinstalar/reparar o servidor (baixa arquivos sem apagar dados)
+repair_server() {
+    local download_link="$1"
+    local clean_version="$2"
+    local formatted_version=$(format_version "$clean_version")
+    
+    echo ""
+    echo -e "${YELLOW}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${YELLOW}║${RESET}     ${WHITE}🔧  REPARANDO/REINSTALANDO TERRARIA SERVER${RESET}                ${YELLOW}║${RESET}"
+    echo -e "${YELLOW}║${RESET}     ${CYAN}Versão: ${GREEN}${formatted_version}${RESET}                                         ${YELLOW}║${RESET}"
+    echo -e "${YELLOW}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+    
+    # Etapa 1: Baixando servidor
+    echo -e "${CYAN}⬇${RESET}  ${WHITE}Baixando Terraria Server ${GREEN}${formatted_version}${WHITE}...${RESET}"
+    curl -sSL "${download_link}" -o terraria-server.zip --progress-bar
+    echo -e "${GREEN}✓${RESET}  ${WHITE}Download concluído!${RESET}"
+    
+    # Etapa 2: Extraindo arquivos
+    show_loading "Extraindo arquivos do servidor..." 2
+    unzip -o terraria-server.zip >/dev/null 2>&1
+    
+    # Etapa 3: Instalando arquivos (sem sobrescrever saves e configs existentes)
+    show_loading "Instalando arquivos do servidor..." 1
+    
+    # Copia apenas os arquivos executáveis essenciais
+    cp -f ${clean_version}/Linux/TerrariaServer ./TerrariaServer 2>/dev/null
+    cp -f ${clean_version}/Linux/TerrariaServer.bin.x86_64 ./TerrariaServer.bin.x86_64 2>/dev/null
+    cp -f ${clean_version}/Linux/TerrariaServer.exe ./TerrariaServer.exe 2>/dev/null
+    
+    # Copia outros arquivos necessários se não existirem
+    [ ! -f "./Terraria.png" ] && cp -f ${clean_version}/Linux/Terraria.png ./Terraria.png 2>/dev/null
+    [ ! -f "./WindowsBase.dll" ] && cp -f ${clean_version}/Linux/WindowsBase.dll ./WindowsBase.dll 2>/dev/null
+    [ ! -f "./FNA.dll" ] && cp -f ${clean_version}/Linux/FNA.dll ./FNA.dll 2>/dev/null
+    [ ! -f "./FNA.dll.config" ] && cp -f ${clean_version}/Linux/FNA.dll.config ./FNA.dll.config 2>/dev/null
+    [ ! -f "./monomachineconfig" ] && cp -f ${clean_version}/Linux/monomachineconfig ./monomachineconfig 2>/dev/null
+    [ ! -f "./changelog.txt" ] && cp -f ${clean_version}/Linux/changelog.txt ./changelog.txt 2>/dev/null
+    
+    # Etapa 4: Configurando permissões
+    show_loading "Configurando permissões..." 1
+    chmod +x TerrariaServer 2>/dev/null
+    chmod +x TerrariaServer.bin.x86_64 2>/dev/null
+    chmod +x TerrariaServer.exe 2>/dev/null
+    
+    # Etapa 5: Limpando arquivos temporários
+    show_loading "Limpando arquivos temporários..." 1
+    rm -f terraria-server.zip
+    rm -rf ${clean_version}
+    
+    # Cria diretórios necessários se não existirem
     mkdir -p logs
+    mkdir -p saves
+    mkdir -p saves/Worlds
+    [ ! -f "./banlist.txt" ] && touch banlist.txt
+    
+    # Atualiza o log de versão
+    echo "Versão Limpa: ${clean_version}" >> logs/run.log
+    
+    echo ""
+    echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${GREEN}║${RESET}     ${WHITE}✅  INSTALAÇÃO/REPARO CONCLUÍDO!${RESET}                         ${GREEN}║${RESET}"
+    echo -e "${GREEN}║${RESET}     ${WHITE}Versão: ${CYAN}${formatted_version}${RESET}                                         ${GREEN}║${RESET}"
+    echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+}
+
+# Verifica se os arquivos essenciais do servidor existem
+check_server_files() {
+    if [ -f "./TerrariaServer.exe" ] && [ -f "./TerrariaServer.bin.x86_64" ]; then
+        return 0  # Arquivos existem
+    else
+        return 1  # Arquivos faltando
+    fi
+}
+
+# Instalação/Reinstalação do servidor (quando arquivos estão faltando)
+if ! check_server_files; then
+    echo ""
+    echo -e "${YELLOW}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${YELLOW}║${RESET}     ${WHITE}⚠️  ARQUIVOS DO SERVIDOR FALTANDO${RESET}                        ${YELLOW}║${RESET}"
+    echo -e "${YELLOW}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+    
+    # Detecta se estamos em contexto de instalação ou start
+    if [ -d "/mnt/server" ] && [ -w "/mnt/server" ]; then
+        # Contexto de INSTALAÇÃO (Pterodactyl install script)
+        echo -e "${BLUE}Contexto: Instalação${RESET}"
+        apk add --no-cache --upgrade curl wget file unzip zip 2>/dev/null || true
+        mkdir -p /mnt/server/
+        cd /mnt/server/ || exit
+        mkdir -p logs
 
     DOWNLOAD_LINK=""
     CLEAN_VERSION=""
@@ -392,4 +476,25 @@ EOF
 
     printf "Install complete."
 
+    else
+        # Contexto de START (servidor já rodando, arquivos faltando)
+        echo -e "${BLUE}Contexto: Reparo (arquivos do servidor faltando)${RESET}"
+        
+        show_loading "Buscando versão mais recente..." 2
+        
+        LATEST_VERSION=$(get_latest_version)
+        DOWNLOAD_LINK=$(get_latest_download_link)
+        
+        if [ ! -z "${DOWNLOAD_LINK}" ] && [ ! -z "${LATEST_VERSION}" ]; then
+            echo -e "${WHITE}Versão encontrada: ${GREEN}$(format_version ${LATEST_VERSION})${RESET}"
+            repair_server "${DOWNLOAD_LINK}" "${LATEST_VERSION}"
+            
+            # Após reparar, inicia o servidor
+            show_loading "Iniciando servidor Terraria..." 2
+            bash <(curl -s https://raw.githubusercontent.com/Ashu11-A/Ashu_eggs/main/Connect/pt-BR/Terraria/launch.sh)
+        else
+            echo -e "${RED}ERRO: Não foi possível encontrar link de download!${RESET}"
+            exit 1
+        fi
+    fi
 fi
