@@ -11,23 +11,98 @@ else
     cd /mnt/server/ || exit
     mkdir -p logs
 
-    DOWNLOAD_LINK=invalid
-    if [ "${TERRARIA_VERSION}" = "latest" ] || [ "${TERRARIA_VERSION}" = "" ]; then
-        DOWNLOAD_LINK=$(curl -sSL https://terraria.fandom.com/wiki/Server#Downloads | grep '>Terraria Server ' | grep -Eoi '<a [^>]+>' | grep -Eo 'href=\"[^\\\"]+\"' | grep -Eo '(http|https):\/\/[^\"]+' | tail -1 | cut -d'?' -f1)
-    else
-        CLEAN_VERSION=$(echo ${TERRARIA_VERSION} | sed 's/\.//g')
-        printf "Downloading terraria server files"
-        DOWNLOAD_LINK=$(curl -sSL https://terraria.fandom.com/wiki/Server#Downloads | grep '>Terraria Server ' | grep -Eoi '<a [^>]+>' | grep -Eo 'href=\"[^\\\"]+\"' | grep -Eo '(http|https):\/\/[^\"]+' | grep "${CLEAN_VERSION}" | cut -d'?' -f1)
-    fi
-    ## this is a simple script to validate a download url actaully exists
-    if [ ! -z "${DOWNLOAD_LINK}" ]; then
-        if curl --output /dev/null --silent --head --fail ${DOWNLOAD_LINK}; then
-            printf "link is valid."
+    DOWNLOAD_LINK=""
+    CLEAN_VERSION=""
+    
+    # Função para buscar link de download do Fandom Wiki
+    get_download_from_fandom() {
+        local version="$1"
+        if [ "${version}" = "latest" ] || [ "${version}" = "" ]; then
+            curl -sSL https://terraria.fandom.com/wiki/Server#Downloads 2>/dev/null | grep '>Terraria Server ' | grep -Eoi '<a [^>]+>' | grep -Eo 'href=\"[^\\\"]+\"' | grep -Eo '(http|https):\/\/[^\"]+' | tail -1 | cut -d'?' -f1
         else
-            printf "link is invalid closing out"
-            exit 2
+            local clean=$(echo ${version} | sed 's/\.//g')
+            curl -sSL https://terraria.fandom.com/wiki/Server#Downloads 2>/dev/null | grep '>Terraria Server ' | grep -Eoi '<a [^>]+>' | grep -Eo 'href=\"[^\\\"]+\"' | grep -Eo '(http|https):\/\/[^\"]+' | grep "${clean}" | cut -d'?' -f1
+        fi
+    }
+    
+    # Função para buscar link de download do Wiki.gg
+    get_download_from_wikigg() {
+        local version="$1"
+        # Primeiro pega a versão mais recente da página de histórico de versões
+        local version_page=""
+        if [ "${version}" = "latest" ] || [ "${version}" = "" ]; then
+            # Busca a versão mais recente na página Desktop_version_history
+            version_page=$(curl -sSL "https://terraria.wiki.gg/wiki/Desktop_version_history" 2>/dev/null | grep -oP '(?<=href="/wiki/)[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+            if [ -z "${version_page}" ]; then
+                # Fallback: buscar na página de Server
+                version_page=$(curl -sSL "https://terraria.wiki.gg/wiki/Server" 2>/dev/null | grep -oP 'terraria-server-[0-9]+\.zip' | head -1 | grep -oP '[0-9]+')
+            fi
+        else
+            version_page=$(echo ${version} | sed 's/\.//g')
+        fi
+        
+        if [ ! -z "${version_page}" ]; then
+            local clean_ver=$(echo ${version_page} | sed 's/\.//g')
+            # Constrói a URL de download oficial
+            echo "https://terraria.org/api/download/pc-dedicated-server/terraria-server-${clean_ver}.zip"
+        fi
+    }
+    
+    # Função para verificar se o link é válido
+    validate_link() {
+        local link="$1"
+        if [ ! -z "${link}" ] && [ "${link}" != "invalid" ]; then
+            if curl --output /dev/null --silent --head --fail "${link}" 2>/dev/null; then
+                echo "valid"
+                return 0
+            fi
+        fi
+        echo "invalid"
+        return 1
+    }
+    
+    printf "Buscando link de download...\n"
+    
+    # Tenta primeiro no Wiki.gg (fonte oficial mais atualizada)
+    printf "Tentando terraria.wiki.gg...\n"
+    DOWNLOAD_LINK=$(get_download_from_wikigg "${TERRARIA_VERSION}")
+    
+    if [ ! -z "${DOWNLOAD_LINK}" ] && [ "$(validate_link "${DOWNLOAD_LINK}")" = "valid" ]; then
+        printf "Link encontrado no Wiki.gg: ${DOWNLOAD_LINK}\n"
+    else
+        # Fallback 1: tenta no Fandom Wiki
+        printf "Wiki.gg falhou, tentando terraria.fandom.com...\n"
+        DOWNLOAD_LINK=$(get_download_from_fandom "${TERRARIA_VERSION}")
+        
+        if [ ! -z "${DOWNLOAD_LINK}" ] && [ "$(validate_link "${DOWNLOAD_LINK}")" = "valid" ]; then
+            printf "Link encontrado no Fandom Wiki: ${DOWNLOAD_LINK}\n"
+        else
+            # Último fallback: tenta diretamente a API oficial do Terraria
+            printf "Fandom Wiki falhou, tentando API oficial do Terraria...\n"
+            if [ "${TERRARIA_VERSION}" = "latest" ] || [ "${TERRARIA_VERSION}" = "" ]; then
+                # Tenta buscar a versão mais recente conhecida
+                for ver in 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
+                    DOWNLOAD_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${ver}.zip"
+                    if [ "$(validate_link "${DOWNLOAD_LINK}")" = "valid" ]; then
+                        printf "Link encontrado na API oficial: ${DOWNLOAD_LINK}\n"
+                        break
+                    fi
+                done
+            else
+                CLEAN_VERSION=$(echo ${TERRARIA_VERSION} | sed 's/\.//g')
+                DOWNLOAD_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${CLEAN_VERSION}.zip"
+            fi
         fi
     fi
+    
+    # Validação final do link
+    if [ -z "${DOWNLOAD_LINK}" ] || [ "$(validate_link "${DOWNLOAD_LINK}")" != "valid" ]; then
+        printf "ERRO: Não foi possível encontrar um link de download válido!\n"
+        printf "Verifique a versão especificada ou tente novamente mais tarde.\n"
+        exit 2
+    fi
+    
+    printf "Link válido encontrado: ${DOWNLOAD_LINK}\n"
     if [ "${TERRARIA_VERSION}" = "1.4.4" ] || [ "${TERRARIA_VERSION}" = "144" ]; then
         CLEAN_VERSION=$(echo ${DOWNLOAD_LINK##*/} | cut -d'-' -f3 | cut -d'.' -f1)
         cat <<EOF >logs/run.log
