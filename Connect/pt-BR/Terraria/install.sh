@@ -1,6 +1,43 @@
 #!/bin/bash
 # shellcheck shell=dash
 
+# Cores
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+WHITE='\033[1;37m'
+RESET='\033[0m'
+
+# Banner MrMoreira Hosting
+show_banner() {
+    echo -e "${BLUE}"
+    echo "╔══════════════════════════════════════════════════════════════════╗"
+    echo "║                                                                  ║"
+    echo -e "║  ${CYAN}███╗   ███╗${BLUE}${WHITE}██████╗${BLUE} ${CYAN}███╗   ███╗ ██████╗ ██████╗ ███████╗██╗${BLUE}${WHITE}██████╗${BLUE}  ${CYAN}█████╗${BLUE}  ║"
+    echo -e "║  ${CYAN}████╗ ████║${BLUE}${WHITE}██╔══██╗${BLUE}${CYAN}████╗ ████║██╔═══██╗██╔══██╗██╔════╝██║${BLUE}${WHITE}██╔══██╗${BLUE}${CYAN}██╔══██╗${BLUE} ║"
+    echo -e "║  ${CYAN}██╔████╔██║${BLUE}${WHITE}██████╔╝${BLUE}${CYAN}██╔████╔██║██║   ██║██████╔╝█████╗  ██║${BLUE}${WHITE}██████╔╝${BLUE}${CYAN}███████║${BLUE} ║"
+    echo -e "║  ${CYAN}██║╚██╔╝██║${BLUE}${WHITE}██╔══██╗${BLUE}${CYAN}██║╚██╔╝██║██║   ██║██╔══██╗██╔══╝  ██║${BLUE}${WHITE}██╔══██╗${BLUE}${CYAN}██╔══██║${BLUE} ║"
+    echo -e "║  ${CYAN}██║ ╚═╝ ██║${BLUE}${WHITE}██║  ██║${BLUE}${CYAN}██║ ╚═╝ ██║╚██████╔╝██║  ██║███████╗██║${BLUE}${WHITE}██║  ██║${BLUE}${CYAN}██║  ██║${BLUE} ║"
+    echo -e "║  ${CYAN}╚═╝     ╚═╝${BLUE}${WHITE}╚═╝  ╚═╝${BLUE}${CYAN}╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝╚══════╝╚═╝${BLUE}${WHITE}╚═╝  ╚═╝${BLUE}${CYAN}╚═╝  ╚═╝${BLUE} ║"
+    echo "║                                                                  ║"
+    echo -e "║                     ${WHITE}H O S T I N G${BLUE}                                ║"
+    echo "║                                                                  ║"
+    echo "╠══════════════════════════════════════════════════════════════════╣"
+    echo -e "║                                                                  ║"
+    echo -e "║   ${CYAN}████████╗███████╗██████╗ ██████╗  █████╗ ██████╗ ██╗ █████╗${BLUE}    ║"
+    echo -e "║   ${CYAN}╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔══██╗██║██╔══██╗${BLUE}   ║"
+    echo -e "║   ${CYAN}   ██║   █████╗  ██████╔╝██████╔╝███████║██████╔╝██║███████║${BLUE}   ║"
+    echo -e "║   ${CYAN}   ██║   ██╔══╝  ██╔══██╗██╔══██╗██╔══██║██╔══██╗██║██╔══██║${BLUE}   ║"
+    echo -e "║   ${CYAN}   ██║   ███████╗██║  ██║██║  ██║██║  ██║██║  ██║██║██║  ██║${BLUE}   ║"
+    echo -e "║   ${CYAN}   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝${BLUE}   ║"
+    echo -e "║                                                                  ║"
+    echo "╠══════════════════════════════════════════════════════════════════╣"
+    echo -e "║              ${WHITE}🌐  https://mrmoreira.com  🌐${BLUE}                       ║"
+    echo "╚══════════════════════════════════════════════════════════════════╝"
+    echo -e "${RESET}"
+}
+
+show_banner
+
 if [ -f "./TerrariaServer.exe" ]; then
     bash <(curl -s https://raw.githubusercontent.com/Ashu11-A/Ashu_eggs/main/Connect/pt-BR/Terraria/launch.sh)
 else
@@ -28,24 +65,22 @@ else
     # Função para buscar link de download do Wiki.gg
     get_download_from_wikigg() {
         local version="$1"
-        # Primeiro pega a versão mais recente da página de histórico de versões
-        local version_page=""
+        local page_content=""
+        local download_url=""
+        
+        # Busca a página de Server do wiki.gg
+        page_content=$(curl -sSL "https://terraria.wiki.gg/wiki/Server" 2>/dev/null)
+        
         if [ "${version}" = "latest" ] || [ "${version}" = "" ]; then
-            # Busca a versão mais recente na página Desktop_version_history
-            version_page=$(curl -sSL "https://terraria.wiki.gg/wiki/Desktop_version_history" 2>/dev/null | grep -oP '(?<=href="/wiki/)[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-            if [ -z "${version_page}" ]; then
-                # Fallback: buscar na página de Server
-                version_page=$(curl -sSL "https://terraria.wiki.gg/wiki/Server" 2>/dev/null | grep -oP 'terraria-server-[0-9]+\.zip' | head -1 | grep -oP '[0-9]+')
-            fi
+            # Pega o primeiro link de download (mais recente)
+            download_url=$(echo "${page_content}" | grep -oE 'https://terraria\.org/api/download/pc-dedicated-server/terraria-server-[0-9]+\.zip' | head -1)
         else
-            version_page=$(echo ${version} | sed 's/\.//g')
+            # Busca versão específica
+            local clean=$(echo ${version} | sed 's/\.//g')
+            download_url=$(echo "${page_content}" | grep -oE "https://terraria\.org/api/download/pc-dedicated-server/terraria-server-${clean}\.zip" | head -1)
         fi
         
-        if [ ! -z "${version_page}" ]; then
-            local clean_ver=$(echo ${version_page} | sed 's/\.//g')
-            # Constrói a URL de download oficial
-            echo "https://terraria.org/api/download/pc-dedicated-server/terraria-server-${clean_ver}.zip"
-        fi
+        echo "${download_url}"
     }
     
     # Função para verificar se o link é válido
