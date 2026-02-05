@@ -38,12 +38,78 @@ show_banner() {
 
 show_banner
 
+# Detecta o diretório de trabalho (instalação vs runtime)
+if [ -d "/mnt/server" ]; then
+    WORK_DIR="/mnt/server"
+else
+    WORK_DIR="/home/container"
+fi
+
+# Cor adicional
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+
+# Função para formatar versão (1454 → 1.4.5.4)
+format_version() {
+    local ver="$1"
+    if [ ${#ver} -eq 4 ]; then
+        # 1454 → 1.4.5.4
+        echo "${ver:0:1}.${ver:1:1}.${ver:2:1}.${ver:3:1}"
+    elif [ ${#ver} -eq 3 ]; then
+        # 144 → 1.4.4
+        echo "${ver:0:1}.${ver:1:1}.${ver:2:1}"
+    elif [ ${#ver} -eq 5 ]; then
+        # 14481 → 1.4.4.8.1
+        echo "${ver:0:1}.${ver:1:1}.${ver:2:1}.${ver:3:1}.${ver:4:1}"
+    else
+        echo "$ver"
+    fi
+}
+
+# Função de loading animado
+show_loading() {
+    local message="$1"
+    local duration="${2:-2}"
+    local spin='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+    local i=0
+    local end=$((SECONDS + duration))
+    
+    while [ $SECONDS -lt $end ]; do
+        i=$(( (i+1) % ${#spin} ))
+        printf "\r${CYAN}${spin:$i:1}${RESET} ${WHITE}${message}${RESET}"
+        sleep 0.1
+    done
+    printf "\r${GREEN}✓${RESET} ${WHITE}${message}${RESET}\n"
+}
+
+# Função para barra de progresso
+show_progress() {
+    local current="$1"
+    local total="$2"
+    local message="$3"
+    local percent=$((current * 100 / total))
+    local filled=$((percent / 5))
+    local empty=$((20 - filled))
+    
+    printf "\r${CYAN}[${GREEN}"
+    printf "%${filled}s" '' | tr ' ' '█'
+    printf "${BLUE}"
+    printf "%${empty}s" '' | tr ' ' '░'
+    printf "${CYAN}]${RESET} ${WHITE}${percent}%% - ${message}${RESET}"
+}
+
 # Função para obter a versão mais recente do wiki.gg
 get_latest_version() {
     local page_content=$(curl -sSL "https://terraria.wiki.gg/wiki/Server#Downloads" 2>/dev/null)
     local latest_url=$(echo "${page_content}" | grep -oE 'https://terraria\.org/api/download/pc-dedicated-server/terraria-server-[0-9]+\.zip' | head -1)
     # Extrai apenas o número da versão (ex: 1454)
     echo "${latest_url}" | grep -oE '[0-9]+\.zip' | sed 's/\.zip//'
+}
+
+# Função para obter o link de download mais recente
+get_latest_download_link() {
+    local page_content=$(curl -sSL "https://terraria.wiki.gg/wiki/Server#Downloads" 2>/dev/null)
+    echo "${page_content}" | grep -oE 'https://terraria\.org/api/download/pc-dedicated-server/terraria-server-[0-9]+\.zip' | head -1
 }
 
 # Função para obter a versão instalada atualmente
@@ -55,39 +121,99 @@ get_installed_version() {
     fi
 }
 
-# Função para realizar a atualização
+# Função para realizar a atualização (no diretório atual)
 perform_update() {
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${RESET}"
-    echo -e "${WHITE}🔄  Atualizando Terraria Server...${RESET}"
-    echo -e "${CYAN}═══════════════════════════════════════════════════════════════${RESET}"
+    local download_link="$1"
+    local clean_version="$2"
+    local formatted_version=$(format_version "$clean_version")
     
-    # Remove os arquivos antigos do servidor
-    echo -e "${BLUE}Removendo arquivos antigos...${RESET}"
+    echo ""
+    echo -e "${CYAN}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${CYAN}║${RESET}     ${WHITE}🔄  ATUALIZANDO TERRARIA SERVER${RESET}                          ${CYAN}║${RESET}"
+    echo -e "${CYAN}║${RESET}     ${CYAN}Nova versão: ${GREEN}${formatted_version}${RESET}                                   ${CYAN}║${RESET}"
+    echo -e "${CYAN}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+    
+    # Etapa 1: Removendo arquivos antigos
+    show_loading "Preparando atualização..." 1
     rm -f ./TerrariaServer 2>/dev/null
     rm -f ./TerrariaServer.bin.x86_64 2>/dev/null
     rm -f ./TerrariaServer.exe 2>/dev/null
     
-    echo -e "${WHITE}✅ Arquivos removidos! Baixando nova versão...${RESET}"
+    # Etapa 2: Baixando nova versão
+    echo -e "${CYAN}⬇${RESET}  ${WHITE}Baixando Terraria Server ${GREEN}${formatted_version}${WHITE}...${RESET}"
+    curl -sSL "${download_link}" -o terraria-server.zip --progress-bar
+    echo -e "${GREEN}✓${RESET}  ${WHITE}Download concluído!${RESET}"
+    
+    # Etapa 3: Extraindo arquivos
+    show_loading "Extraindo arquivos do servidor..." 2
+    unzip -o terraria-server.zip >/dev/null 2>&1
+    
+    # Etapa 4: Instalando arquivos
+    show_loading "Instalando novos arquivos..." 1
+    cp -R ${clean_version}/Linux/* ./
+    
+    # Etapa 5: Configurando permissões
+    show_loading "Configurando permissões..." 1
+    chmod +x TerrariaServer.bin.x86_64 2>/dev/null
+    chmod +x TerrariaServer.exe 2>/dev/null
+    
+    # Etapa 6: Limpando arquivos temporários
+    show_loading "Limpando arquivos temporários..." 1
+    rm -f terraria-server.zip
+    rm -rf ${clean_version}
+    rm -f System* 2>/dev/null
+    rm -f monoconfig 2>/dev/null
+    rm -f Mono* 2>/dev/null
+    rm -f mscorlib.dll 2>/dev/null
+    
+    # Atualiza o log de versão
+    mkdir -p logs
+    echo "Versão Limpa: ${clean_version}" >> logs/run.log
+    
+    echo ""
+    echo -e "${GREEN}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${GREEN}║${RESET}     ${WHITE}✅  ATUALIZAÇÃO CONCLUÍDA COM SUCESSO!${RESET}                    ${GREEN}║${RESET}"
+    echo -e "${GREEN}║${RESET}     ${WHITE}Versão: ${CYAN}${formatted_version}${RESET}                                         ${GREEN}║${RESET}"
+    echo -e "${GREEN}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
 }
 
 # Verifica se o servidor já está instalado
 if [ -f "./TerrariaServer.exe" ]; then
-    echo -e "${BLUE}Servidor Terraria detectado. Verificando atualizações...${RESET}"
+    echo ""
+    echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${RESET}"
+    echo -e "${BLUE}║${RESET}     ${WHITE}🎮  TERRARIA SERVER DETECTADO${RESET}                             ${BLUE}║${RESET}"
+    echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${RESET}"
+    echo ""
+    
+    show_loading "Verificando atualizações disponíveis..." 2
     
     INSTALLED_VERSION=$(get_installed_version)
     LATEST_VERSION=$(get_latest_version)
     
-    echo -e "${WHITE}Versão instalada: ${CYAN}${INSTALLED_VERSION:-Desconhecida}${RESET}"
-    echo -e "${WHITE}Versão mais recente: ${CYAN}${LATEST_VERSION}${RESET}"
+    INSTALLED_FORMATTED=$(format_version "${INSTALLED_VERSION}")
+    LATEST_FORMATTED=$(format_version "${LATEST_VERSION}")
+    
+    echo ""
+    echo -e "  ${WHITE}📦 Versão instalada:   ${CYAN}${INSTALLED_FORMATTED:-Desconhecida}${RESET} ${BLUE}(${INSTALLED_VERSION:-?})${RESET}"
+    echo -e "  ${WHITE}🆕 Versão mais recente: ${GREEN}${LATEST_FORMATTED}${RESET} ${BLUE}(${LATEST_VERSION})${RESET}"
+    echo ""
     
     # Se AUTO_UPDATE estiver habilitado e houver versão nova
     if [ "${AUTO_UPDATE}" = "1" ] || [ "${AUTO_UPDATE}" = "true" ]; then
         if [ ! -z "${LATEST_VERSION}" ] && [ "${INSTALLED_VERSION}" != "${LATEST_VERSION}" ]; then
-            echo -e "${CYAN}🆕 Nova versão disponível! Iniciando atualização automática...${RESET}"
-            perform_update
-            # Continua para baixar a nova versão (não executa o else abaixo)
+            echo -e "  ${YELLOW}⚠️  Nova versão disponível!${RESET}"
+            echo ""
+            DOWNLOAD_LINK=$(get_latest_download_link)
+            perform_update "${DOWNLOAD_LINK}" "${LATEST_VERSION}"
+            # Após atualizar, inicia o servidor
+            show_loading "Iniciando servidor Terraria..." 2
+            bash <(curl -s https://raw.githubusercontent.com/Ashu11-A/Ashu_eggs/main/Connect/pt-BR/Terraria/launch.sh)
+            exit 0
         else
-            echo -e "${WHITE}✅ Servidor já está na versão mais recente!${RESET}"
+            echo -e "  ${GREEN}✅ Servidor já está na versão mais recente!${RESET}"
+            echo ""
             bash <(curl -s https://raw.githubusercontent.com/Ashu11-A/Ashu_eggs/main/Connect/pt-BR/Terraria/launch.sh)
             exit 0
         fi
@@ -98,7 +224,7 @@ if [ -f "./TerrariaServer.exe" ]; then
     fi
 fi
 
-# Instalação / Atualização do servidor
+# Instalação do servidor (apenas quando não existe TerrariaServer.exe)
 if [ ! -f "./TerrariaServer.exe" ]; then
 
     apk add --no-cache --upgrade curl wget file unzip zip
