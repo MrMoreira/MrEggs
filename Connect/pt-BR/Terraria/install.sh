@@ -210,17 +210,17 @@ if [ -f "./TerrariaServer.exe" ]; then
             perform_update "${DOWNLOAD_LINK}" "${LATEST_VERSION}"
             # Após atualizar, inicia o servidor
             show_loading "Iniciando servidor Terraria..." 2
-            bash <(curl -s https://raw.githubusercontent.com/Ashu11-A/Ashu_eggs/main/Connect/pt-BR/Terraria/launch.sh)
+            bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
             exit 0
         else
             echo -e "  ${GREEN}✅ Servidor já está na versão mais recente!${RESET}"
             echo ""
-            bash <(curl -s https://raw.githubusercontent.com/Ashu11-A/Ashu_eggs/main/Connect/pt-BR/Terraria/launch.sh)
+            bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
             exit 0
         fi
     else
         # AUTO_UPDATE desabilitado, apenas inicia o servidor
-        bash <(curl -s https://raw.githubusercontent.com/Ashu11-A/Ashu_eggs/main/Connect/pt-BR/Terraria/launch.sh)
+        bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
         exit 0
     fi
 fi
@@ -491,7 +491,7 @@ EOF
             
             # Após reparar, inicia o servidor
             show_loading "Iniciando servidor Terraria..." 2
-            bash <(curl -s https://raw.githubusercontent.com/Ashu11-A/Ashu_eggs/main/Connect/pt-BR/Terraria/launch.sh)
+            bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
         else
             echo -e "${RED}ERRO: Não foi possível encontrar link de download!${RESET}"
             exit 1
