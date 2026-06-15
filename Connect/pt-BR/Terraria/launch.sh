@@ -1,9 +1,10 @@
 #!/bin/bash
 # shellcheck shell=dash
 
-# Fix: Mono TermInfoReader tem limite de 4KB; xterm-256color ultrapassa esse limite.
-# Forçar TERM=xterm (ficheiro terminfo ~3KB) resolve o crash "File must be smaller than 4K".
-export TERM=xterm
+# Fix: Mono TermInfoReader tem limite de 4KB e falha com xterm-256color (~10KB).
+# TERM=dumb não possui ficheiro terminfo, então o Mono não tenta lê-lo.
+# É a solução definitiva para o crash "File must be smaller than 4K" em containers Alpine.
+export TERM=dumb
 
 if [ "${TERRARIA_VERSION}" = "1.4.4" ] || [ "${TERRARIA_VERSION}" = "144" ]; then
     if [ "${FAKETIME}" = "1" ]; then
