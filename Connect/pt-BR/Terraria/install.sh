@@ -399,35 +399,45 @@ if ! check_server_files; then
     }
     
     printf "Buscando link de download...\n"
-    
-    # Tenta primeiro no Wiki.gg (fonte oficial mais atualizada)
-    printf "Tentando terraria.wiki.gg...\n"
-    DOWNLOAD_LINK=$(get_download_from_wikigg "${TERRARIA_VERSION}")
-    
-    if [ ! -z "${DOWNLOAD_LINK}" ] && [ "$(validate_link "${DOWNLOAD_LINK}")" = "valid" ]; then
-        printf "Link encontrado no Wiki.gg: ${DOWNLOAD_LINK}\n"
+
+    if [ "${TERRARIA_VERSION}" = "latest" ] || [ "${TERRARIA_VERSION}" = "" ]; then
+        # Para "latest": testa API direta primeiro (wiki é frequentemente desatualizado)
+        printf "Verificando versões mais recentes via API oficial...\n"
+        for ver in 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
+            TEST_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${ver}.zip"
+            if [ "$(validate_link "${TEST_LINK}")" = "valid" ]; then
+                DOWNLOAD_LINK="${TEST_LINK}"
+                printf "Versão mais recente encontrada via API: ${DOWNLOAD_LINK}\n"
+                break
+            fi
+        done
+
+        # Fallback: tenta wiki.gg se a API não retornou nada
+        if [ -z "${DOWNLOAD_LINK}" ]; then
+            printf "API falhou, tentando terraria.wiki.gg...\n"
+            DOWNLOAD_LINK=$(get_download_from_wikigg "latest")
+            [ ! -z "${DOWNLOAD_LINK}" ] && printf "Link encontrado no Wiki.gg: ${DOWNLOAD_LINK}\n"
+        fi
+
+        # Fallback final: fandom wiki
+        if [ -z "${DOWNLOAD_LINK}" ]; then
+            printf "Wiki.gg falhou, tentando terraria.fandom.com...\n"
+            DOWNLOAD_LINK=$(get_download_from_fandom "latest")
+            [ ! -z "${DOWNLOAD_LINK}" ] && printf "Link encontrado no Fandom Wiki: ${DOWNLOAD_LINK}\n"
+        fi
     else
-        # Fallback 1: tenta no Fandom Wiki
-        printf "Wiki.gg falhou, tentando terraria.fandom.com...\n"
-        DOWNLOAD_LINK=$(get_download_from_fandom "${TERRARIA_VERSION}")
-        
-        if [ ! -z "${DOWNLOAD_LINK}" ] && [ "$(validate_link "${DOWNLOAD_LINK}")" = "valid" ]; then
-            printf "Link encontrado no Fandom Wiki: ${DOWNLOAD_LINK}\n"
-        else
-            # Último fallback: tenta diretamente a API oficial do Terraria
-            printf "Fandom Wiki falhou, tentando API oficial do Terraria...\n"
-            if [ "${TERRARIA_VERSION}" = "latest" ] || [ "${TERRARIA_VERSION}" = "" ]; then
-                # Tenta buscar a versão mais recente conhecida
-                for ver in 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
-                    DOWNLOAD_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${ver}.zip"
-                    if [ "$(validate_link "${DOWNLOAD_LINK}")" = "valid" ]; then
-                        printf "Link encontrado na API oficial: ${DOWNLOAD_LINK}\n"
-                        break
-                    fi
-                done
-            else
-                CLEAN_VERSION=$(echo ${TERRARIA_VERSION} | sed 's/\.//g')
-                DOWNLOAD_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${CLEAN_VERSION}.zip"
+        # Versão específica: vai direto na API oficial sem consultar wiki
+        CLEAN_VERSION=$(echo ${TERRARIA_VERSION} | sed 's/\.//g')
+        DOWNLOAD_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${CLEAN_VERSION}.zip"
+        printf "Versão específica solicitada: ${DOWNLOAD_LINK}\n"
+
+        # Fallback: tenta wiki se a URL direta não existir
+        if [ "$(validate_link "${DOWNLOAD_LINK}")" != "valid" ]; then
+            printf "URL direta inválida, tentando terraria.wiki.gg...\n"
+            DOWNLOAD_LINK=$(get_download_from_wikigg "${TERRARIA_VERSION}")
+            if [ -z "${DOWNLOAD_LINK}" ] || [ "$(validate_link "${DOWNLOAD_LINK}")" != "valid" ]; then
+                printf "Wiki.gg falhou, tentando terraria.fandom.com...\n"
+                DOWNLOAD_LINK=$(get_download_from_fandom "${TERRARIA_VERSION}")
             fi
         fi
     fi
