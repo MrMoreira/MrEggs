@@ -99,16 +99,33 @@ show_progress() {
     printf "${CYAN}]${RESET} ${WHITE}${percent}%% - ${message}${RESET}"
 }
 
-# Função para obter a versão mais recente do wiki.gg
+# Função para obter a versão mais recente (API oficial primeiro, wiki como fallback)
 get_latest_version() {
+    # Testa direto na API oficial (do mais novo para o mais antigo)
+    for ver in 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
+        local test_url="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${ver}.zip"
+        if curl --output /dev/null --silent --head --fail "${test_url}" 2>/dev/null; then
+            echo "${ver}"
+            return 0
+        fi
+    done
+    # Fallback: tenta extrair do wiki.gg
     local page_content=$(curl -sSL "https://terraria.wiki.gg/wiki/Server#Downloads" 2>/dev/null)
     local latest_url=$(echo "${page_content}" | grep -oE 'https://terraria\.org/api/download/pc-dedicated-server/terraria-server-[0-9]+\.zip' | head -1)
-    # Extrai apenas o número da versão (ex: 1454)
     echo "${latest_url}" | grep -oE '[0-9]+\.zip' | sed 's/\.zip//'
 }
 
-# Função para obter o link de download mais recente
+# Função para obter o link de download mais recente (API oficial primeiro, wiki como fallback)
 get_latest_download_link() {
+    # Testa direto na API oficial (do mais novo para o mais antigo)
+    for ver in 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
+        local test_url="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${ver}.zip"
+        if curl --output /dev/null --silent --head --fail "${test_url}" 2>/dev/null; then
+            echo "${test_url}"
+            return 0
+        fi
+    done
+    # Fallback: tenta extrair do wiki.gg
     local page_content=$(curl -sSL "https://terraria.wiki.gg/wiki/Server#Downloads" 2>/dev/null)
     echo "${page_content}" | grep -oE 'https://terraria\.org/api/download/pc-dedicated-server/terraria-server-[0-9]+\.zip' | head -1
 }
