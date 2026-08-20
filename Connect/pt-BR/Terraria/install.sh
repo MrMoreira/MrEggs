@@ -187,39 +187,72 @@ if [ -f "./TerrariaServer.exe" ]; then
     echo -e "${BLUE}║${RESET}     ${WHITE}🎮  TERRARIA SERVER DETECTADO${RESET}                             ${BLUE}║${RESET}"
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${RESET}"
     echo ""
-    
-    show_loading "Verificando atualizações disponíveis..." 2
-    
+
+    show_loading "Verificando versões..." 2
+
     INSTALLED_VERSION=$(get_installed_version)
-    LATEST_VERSION=$(get_latest_version)
-    
     INSTALLED_FORMATTED=$(format_version "${INSTALLED_VERSION}")
-    LATEST_FORMATTED=$(format_version "${LATEST_VERSION}")
-    
+
+    # Normaliza a versão definida pelo usuário no painel (remove pontos: 1.4.5.7 -> 1457)
+    USER_VERSION_CLEAN=$(echo "${TERRARIA_VERSION}" | sed 's/\.//g')
+
     echo ""
-    echo -e "  ${WHITE}📦 Versão instalada:   ${CYAN}${INSTALLED_FORMATTED:-Desconhecida}${RESET} ${BLUE}(${INSTALLED_VERSION:-?})${RESET}"
-    echo -e "  ${WHITE}🆕 Versão mais recente: ${GREEN}${LATEST_FORMATTED}${RESET} ${BLUE}(${LATEST_VERSION})${RESET}"
-    echo ""
-    
-    # Se AUTO_UPDATE estiver habilitado e houver versão nova
-    if [ "${AUTO_UPDATE}" = "1" ] || [ "${AUTO_UPDATE}" = "true" ]; then
+    echo -e "  ${WHITE}📦 Versão instalada:    ${CYAN}${INSTALLED_FORMATTED:-Desconhecida}${RESET} ${BLUE}(${INSTALLED_VERSION:-?})${RESET}"
+
+    # ─── CASO 1: Usuário definiu versão específica diferente da instalada ───
+    if [ ! -z "${TERRARIA_VERSION}" ] \
+        && [ "${TERRARIA_VERSION}" != "latest" ] \
+        && [ "${USER_VERSION_CLEAN}" != "${INSTALLED_VERSION}" ]; then
+
+        USER_FORMATTED=$(format_version "${USER_VERSION_CLEAN}")
+        echo -e "  ${WHITE}🎯 Versão no painel:    ${YELLOW}${USER_FORMATTED}${RESET} ${BLUE}(${USER_VERSION_CLEAN})${RESET}"
+        echo ""
+        echo -e "  ${YELLOW}⚠️  Versão diferente da instalada! Aplicando versão definida no painel...${RESET}"
+        echo ""
+
+        DOWNLOAD_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${USER_VERSION_CLEAN}.zip"
+
+        if curl --output /dev/null --silent --head --fail "${DOWNLOAD_LINK}" 2>/dev/null; then
+            perform_update "${DOWNLOAD_LINK}" "${USER_VERSION_CLEAN}"
+        else
+            echo -e "  ${RED}❌ Link inválido para versão ${USER_FORMATTED}: ${DOWNLOAD_LINK}${RESET}"
+            echo -e "  ${YELLOW}⚠️  Iniciando com a versão instalada...${RESET}"
+        fi
+
+        show_loading "Iniciando servidor Terraria..." 2
+        bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
+        exit 0
+
+    # ─── CASO 2: AUTO_UPDATE ativado → verifica versão mais recente no wiki ───
+    elif [ "${AUTO_UPDATE}" = "1" ] || [ "${AUTO_UPDATE}" = "true" ]; then
+        LATEST_VERSION=$(get_latest_version)
+        LATEST_FORMATTED=$(format_version "${LATEST_VERSION}")
+
+        echo -e "  ${WHITE}🆕 Versão mais recente: ${GREEN}${LATEST_FORMATTED}${RESET} ${BLUE}(${LATEST_VERSION})${RESET}"
+        echo ""
+
         if [ ! -z "${LATEST_VERSION}" ] && [ "${INSTALLED_VERSION}" != "${LATEST_VERSION}" ]; then
-            echo -e "  ${YELLOW}⚠️  Nova versão disponível!${RESET}"
+            echo -e "  ${YELLOW}⚠️  Nova versão disponível! Atualizando...${RESET}"
             echo ""
             DOWNLOAD_LINK=$(get_latest_download_link)
             perform_update "${DOWNLOAD_LINK}" "${LATEST_VERSION}"
-            # Após atualizar, inicia o servidor
-            show_loading "Iniciando servidor Terraria..." 2
-            bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
-            exit 0
         else
             echo -e "  ${GREEN}✅ Servidor já está na versão mais recente!${RESET}"
             echo ""
-            bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
-            exit 0
         fi
+
+        show_loading "Iniciando servidor Terraria..." 2
+        bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
+        exit 0
+
+    # ─── CASO 3: Tudo igual ou auto-update desativado, apenas inicia ───
     else
-        # AUTO_UPDATE desabilitado, apenas inicia o servidor
+        LATEST_VERSION=$(get_latest_version)
+        LATEST_FORMATTED=$(format_version "${LATEST_VERSION}")
+        echo -e "  ${WHITE}🆕 Versão mais recente: ${GREEN}${LATEST_FORMATTED}${RESET} ${BLUE}(${LATEST_VERSION})${RESET}"
+        echo ""
+        echo -e "  ${CYAN}ℹ️  Atualização automática desativada. Iniciando servidor...${RESET}"
+        echo ""
         bash <(curl -s https://raw.githubusercontent.com/MrMoreira/MrEggs/main/Connect/pt-BR/Terraria/launch.sh)
         exit 0
     fi
@@ -385,7 +418,7 @@ if ! check_server_files; then
             printf "Fandom Wiki falhou, tentando API oficial do Terraria...\n"
             if [ "${TERRARIA_VERSION}" = "latest" ] || [ "${TERRARIA_VERSION}" = "" ]; then
                 # Tenta buscar a versão mais recente conhecida
-                for ver in 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
+                for ver in 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
                     DOWNLOAD_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${ver}.zip"
                     if [ "$(validate_link "${DOWNLOAD_LINK}")" = "valid" ]; then
                         printf "Link encontrado na API oficial: ${DOWNLOAD_LINK}\n"
