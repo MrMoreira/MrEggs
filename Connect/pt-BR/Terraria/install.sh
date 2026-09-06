@@ -102,7 +102,7 @@ show_progress() {
 # Função para obter a versão mais recente (API oficial primeiro, wiki como fallback)
 get_latest_version() {
     # Testa direto na API oficial (do mais novo para o mais antigo)
-    for ver in  1458 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
+    for ver in 1458 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
         local test_url="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${ver}.zip"
         if curl --output /dev/null --silent --head --fail "${test_url}" 2>/dev/null; then
             echo "${ver}"
@@ -420,7 +420,7 @@ if ! check_server_files; then
     if [ "${TERRARIA_VERSION}" = "latest" ] || [ "${TERRARIA_VERSION}" = "" ]; then
         # Para "latest": testa API direta primeiro (wiki é frequentemente desatualizado)
         printf "Verificando versões mais recentes via API oficial...\n"
-        for ver in 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
+        for ver in 1458 1457 1456 1455 1454 1453 1452 1451 1450 1449 1448 1447 1446 1445 1444; do
             TEST_LINK="https://terraria.org/api/download/pc-dedicated-server/terraria-server-${ver}.zip"
             if [ "$(validate_link "${TEST_LINK}")" = "valid" ]; then
                 DOWNLOAD_LINK="${TEST_LINK}"
